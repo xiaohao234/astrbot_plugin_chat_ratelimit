@@ -1,6 +1,6 @@
 name: astrbot_plugin_chat_ratelimit
 desc: 限制 Bot 群聊 LLM 对话总频率，达到限额后 @Bot 不再触发 LLM，改为随机回复自定义提示语
 help: '在插件管理页配置每分钟/半小时/小时/每天的对话总限额与随机回复语。管理员可发送 /ratelimit 查看当前用量。'
-version: v1.2.0
+version: v1.3.0
 author: xiaohao234
 repo: https://github.com/xiaohao234/astrbot_plugin_chat_ratelimit

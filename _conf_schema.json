@@ -7,22 +7,22 @@
   "limit_per_minute": {
     "type": "int",
     "default": 5,
-    "description": "每分钟最多 LLM 对话次数（所有用户合计，0 = 不限制）"
+    "description": "每分钟最多 LLM 对话次数（该群所有用户合计、每个群独立计数，0 = 不限制）"
   },
   "limit_per_half_hour": {
     "type": "int",
     "default": 30,
-    "description": "每半小时最多 LLM 对话次数（所有用户合计，0 = 不限制）"
+    "description": "每半小时最多 LLM 对话次数（该群所有用户合计、每个群独立计数，0 = 不限制）"
   },
   "limit_per_hour": {
     "type": "int",
     "default": 0,
-    "description": "每小时最多 LLM 对话次数（所有用户合计，0 = 不限制）"
+    "description": "每小时最多 LLM 对话次数（该群所有用户合计、每个群独立计数，0 = 不限制）"
   },
   "limit_per_day": {
     "type": "int",
     "default": 200,
-    "description": "每天最多 LLM 对话次数（所有用户合计，0 = 不限制）"
+    "description": "每天最多 LLM 对话次数（该群所有用户合计、每个群独立计数，0 = 不限制）"
   },
   "reply_texts": {
     "type": "list",
