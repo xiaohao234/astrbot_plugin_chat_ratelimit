@@ -18,7 +18,7 @@ from astrbot.api import logger, AstrBotConfig
     "astrbot_plugin_chat_ratelimit",
     "xiaohao234",
     "限制 Bot 群聊 LLM 对话总频率，超出限额后 @Bot 只回复自定义随机提示语",
-    "1.0.0",
+    "1.1.0",
     "https://github.com/xiaohao234/astrbot_plugin_chat_ratelimit",
 )
 class ChatRateLimitPlugin(Star):
@@ -35,6 +35,8 @@ class ChatRateLimitPlugin(Star):
         self.config = config
         # 每个窗口一份时间戳队列（所有用户共享）
         self.records = {name: deque() for name in self.WINDOW_DEFS}
+        # 提示语冷却：会话 -> 上次发送提示语的时间戳
+        self._last_notice = {}
         logger.info("[chat_ratelimit] 插件已加载")
 
     # ---------- 限流核心 ----------
@@ -73,10 +75,19 @@ class ChatRateLimitPlugin(Star):
             return "当前对话太频繁啦，稍后再试试吧~"
         return random.choice(texts)
 
+    def _get_notice_cooldown(self) -> int:
+        try:
+            return max(0, int(self.config.get("notice_cooldown", 30) or 0))
+        except (TypeError, ValueError):
+            return 30
+
     def _handle(self, event: AstrMessageEvent):
         """统一的拦截逻辑（生成器）"""
         # 只有 @/唤醒 Bot 的消息才会触发 LLM，只对这些消息计数和拦截
         if not getattr(event, "is_wake", False):
+            return
+        # 命令（/help、/ratelimit 等）不触发 LLM 对话：不计数，也不拦截
+        if getattr(event, "is_at_or_wake_command", False):
             return
         if not self.config.get("enabled", True):
             return
@@ -88,6 +99,16 @@ class ChatRateLimitPlugin(Star):
         logger.info(
             f"[chat_ratelimit] 已达到 {window} 窗口限额，拦截本次 LLM 对话"
         )
+        # 无论是否发送提示语，都要拦截本次 LLM 对话
+        session = getattr(event, "unified_msg_origin", "") or id(event)
+        now = time.time()
+        cooldown = self._get_notice_cooldown()
+        last = self._last_notice.get(session, 0)
+        if cooldown > 0 and now - last < cooldown:
+            # 冷却期内：静默拦截，避免提示语刷屏
+            event.stop_event()
+            return
+        self._last_notice[session] = now
         yield event.plain_result(self._get_reply())
         # 终止事件传播，后续默认 LLM 处理不再执行
         event.stop_event()

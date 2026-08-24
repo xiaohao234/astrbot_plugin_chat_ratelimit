@@ -33,6 +33,11 @@
       "提问的人太多啦，稍后再试试哦~"
     ]
   },
+  "notice_cooldown": {
+    "type": "int",
+    "default": 30,
+    "description": "超出限额后提示语的发送冷却（秒，按会话独立计算；冷却内静默拦截不回复，0 = 每次 @ 都回复）"
+  },
   "also_limit_private": {
     "type": "bool",
     "description": "是否同样限制私聊（默认只限制群聊 @Bot）",
