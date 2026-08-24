@@ -1,0 +1,4 @@
+# 统一换行符，保证 Windows / Linux 检出一致
+* text=auto eol=lf
+*.png binary
+*.jpg binary

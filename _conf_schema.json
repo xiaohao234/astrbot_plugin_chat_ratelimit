@@ -1,0 +1,41 @@
+{
+  "enabled": {
+    "type": "bool",
+    "description": "总开关：是否启用 LLM 对话频率限制",
+    "default": true
+  },
+  "limit_per_minute": {
+    "type": "int",
+    "default": 5,
+    "description": "每分钟最多 LLM 对话次数（所有用户合计，0 = 不限制）"
+  },
+  "limit_per_half_hour": {
+    "type": "int",
+    "default": 30,
+    "description": "每半小时最多 LLM 对话次数（所有用户合计，0 = 不限制）"
+  },
+  "limit_per_hour": {
+    "type": "int",
+    "default": 0,
+    "description": "每小时最多 LLM 对话次数（所有用户合计，0 = 不限制）"
+  },
+  "limit_per_day": {
+    "type": "int",
+    "default": 200,
+    "description": "每天最多 LLM 对话次数（所有用户合计，0 = 不限制）"
+  },
+  "reply_texts": {
+    "type": "list",
+    "description": "超出限额后 @Bot 的随机回复语（每句一行，随机抽取一条发送）",
+    "default": [
+      "今天人气太旺啦，我需要休息一下，稍后再来找我吧~",
+      "对话额度暂时用完了，让我喘口气，晚点再聊！",
+      "提问的人太多啦，稍后再试试哦~"
+    ]
+  },
+  "also_limit_private": {
+    "type": "bool",
+    "description": "是否同样限制私聊（默认只限制群聊 @Bot）",
+    "default": false
+  }
+}
