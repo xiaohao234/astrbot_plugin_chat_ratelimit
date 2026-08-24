@@ -2,8 +2,10 @@
 """
 astrbot_plugin_chat_ratelimit
 群聊 LLM 对话总量限流插件：
-所有用户共享滑动窗口配额，达到限额后再 @Bot 不会触发 LLM 对话，
+所有用户共享滑动窗口配额。只有消息中显式 @机器人 时才计数；
+达到限额后再 @Bot 不会触发 LLM 对话，
 而是随机回复一条在插件管理页配置的提示语。
+引用/回复消息但不 @机器人、@其他用户、普通聊天均不处理。
 """
 import random
 import time
@@ -12,13 +14,14 @@ from collections import deque
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
+from astrbot.api.message_components import At
 
 
 @register(
     "astrbot_plugin_chat_ratelimit",
     "xiaohao234",
     "限制 Bot 群聊 LLM 对话总频率，超出限额后 @Bot 只回复自定义随机提示语",
-    "1.1.0",
+    "1.2.0",
     "https://github.com/xiaohao234/astrbot_plugin_chat_ratelimit",
 )
 class ChatRateLimitPlugin(Star):
@@ -81,15 +84,38 @@ class ChatRateLimitPlugin(Star):
         except (TypeError, ValueError):
             return 30
 
-    def _handle(self, event: AstrMessageEvent):
+    def _is_at_bot(self, event: AstrMessageEvent) -> bool:
+        """
+        严格判断消息链中是否存在显式 @机器人 的 At 组件。
+        不使用 is_wake（它会把"回复/引用 bot 消息"也算作唤醒）。
+        """
+        try:
+            self_id = str(event.get_self_id() or "").strip()
+        except Exception:
+            self_id = ""
+        if not self_id:
+            self_id = str(getattr(event.message_obj, "self_id", "") or "").strip()
+        if not self_id:
+            return False
+        try:
+            chain = event.get_messages() or []
+        except Exception:
+            chain = getattr(event.message_obj, "message", []) or []
+        for comp in chain:
+            # At.qq 兼容 str / int；@全体成员的 qq 为 "all"，不会误匹配
+            if isinstance(comp, At) and str(getattr(comp, "qq", "")) == self_id:
+                return True
+        return False
+
+    def _handle(self, event: AstrMessageEvent, need_at: bool = True):
         """统一的拦截逻辑（生成器）"""
-        # 只有 @/唤醒 Bot 的消息才会触发 LLM，只对这些消息计数和拦截
-        if not getattr(event, "is_wake", False):
+        if not self.config.get("enabled", True):
+            return
+        # 群聊：只有显式 @机器人 才计数/拦截；引用不@、@别人、普通聊天一概不管
+        if need_at and not self._is_at_bot(event):
             return
         # 命令（/help、/ratelimit 等）不触发 LLM 对话：不计数，也不拦截
         if getattr(event, "is_at_or_wake_command", False):
-            return
-        if not self.config.get("enabled", True):
             return
 
         allowed, window = self._try_acquire()
@@ -117,14 +143,15 @@ class ChatRateLimitPlugin(Star):
 
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE, priority=20)
     async def on_group_message(self, event: AstrMessageEvent):
-        for result in self._handle(event):
+        for result in self._handle(event, need_at=True):
             yield result
 
     @filter.event_message_type(filter.EventMessageType.PRIVATE_MESSAGE, priority=20)
     async def on_private_message(self, event: AstrMessageEvent):
         if not self.config.get("also_limit_private", False):
             return
-        for result in self._handle(event):
+        # 私聊没有 @ 概念，开启限制私聊后对所有消息生效
+        for result in self._handle(event, need_at=False):
             yield result
 
     # ---------- 管理员命令 ----------
