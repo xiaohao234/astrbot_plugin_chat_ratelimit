@@ -15,7 +15,7 @@ AstrBot 群聊 LLM 对话总量限流插件。当**某个群内所有用户合�
 - ✅ 提示语发送冷却（默认 30 秒/会话），避免被连续 @ 时提示语刷屏；冷却内静默拦截
 - ✅ 不影响任何 Bot 命令（`/help`、其他插件命令等不计数、不拦截，超限时也照常可用）
 - ✅ 可选是否同样限制私聊（默认只限制群聊）
-- ✅ 管理员命令 `/ratelimit` 查看当前群各窗口用量
+- ✅ 管理员命令 `/ratelimit` 查看当前群各窗口用量；`/ratelimit_debug` 诊断机器人ID识别与@判定
 - ✅ 纯 Python 标准库实现，无第三方依赖，Windows / Linux 通用
 
 > 环境要求：AstrBot **v3.4.21 及以上**（依赖事件处理器 `priority` 参数）。
@@ -64,3 +64,22 @@ https://github.com/xiaohao234/astrbot_plugin_chat_ratelimit
 ## Author
 
 [xiaohao234](https://github.com/xiaohao234)
+
+## 故障排查
+
+**@机器人 不触发限流？** 在群里 `@机器人 /ratelimit_debug`，检查输出：
+- `机器人ID识别` 为"未识别(为空!)" → AstrBot 版本过旧，请升级 AstrBot
+- `判定为@机器人` 为 False 但消息链里有 `At(机器人QQ)` → 把输出发给作者排查
+
+**@其他人 时后台报错？** 该报错来自 AstrBot 的 napcat(aiocqhttp) 适配器本身——它对每个 @ 都会调用
+OneBot API `get_group_member_info` 获取昵称，调用失败即报错，与本插件无关（本插件不发起任何 API 调用）。
+验证方法：停用本插件后再 @别人，报错依旧则在。解决：升级 AstrBot / napcat 至最新版本。
+
+## 版本历史
+
+- v1.4.0 修复：移除对 `is_at_or_wake_command` 的依赖（该标志在 @机器人 时也为 True，导致限流永不触发）；
+  机器人ID多渠道识别（新增 napcat 原始报文 self_id 兜底）；命令识别改为可靠信号；新增 `/ratelimit_debug`；防御性异常捕获
+- v1.3.0 限额改为每个群独立计算
+- v1.2.0 触发条件改为严格解析消息链 At 组件
+- v1.1.0 修复超限误拦截命令；新增提示语冷却
+- v1.0.0 初版
