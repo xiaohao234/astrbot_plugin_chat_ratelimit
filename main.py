@@ -211,13 +211,16 @@ class ChatRateLimitPlugin(Star):
         cooldown = self._get_notice_cooldown()
         last = self._last_notice.get(session, 0)
         if cooldown > 0 and now - last < cooldown:
-            # 冷却期内：静默拦截，避免提示语刷屏
-            event.stop_event()
+            # 冷却期内：静默禁止默认 LLM，避免提示语刷屏；
+            # 不终止事件传播，其他插件（关键词回复、打卡等）仍能正常处理本条消息
+            event.should_call_llm(True)
             return
         self._last_notice[session] = now
         yield event.plain_result(self._get_reply())
-        # 终止事件传播，后续默认 LLM 处理不再执行
-        event.stop_event()
+        # 仅禁止默认 LLM 处理本条消息（should_call_llm 的参数含义是“是否禁止”，
+        # True 为拦截；见 AstrBot astr_message_event.py 的 docstring）。
+        # 不调用 stop_event()，否则优先级更低的插件会被连带压制
+        event.should_call_llm(True)
 
     # ---------- 事件监听 ----------
 
