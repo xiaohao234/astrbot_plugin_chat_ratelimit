@@ -85,9 +85,10 @@ api_star.register = register
 
 # ---------- 加载真实 main.py ----------
 import importlib.util
+import os
 spec = importlib.util.spec_from_file_location(
     "main",
-    r"G:\WBwork\astr-rest\astrbot_plugin_chat_ratelimit\main.py",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "main.py"),
 )
 main = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(main)
@@ -109,6 +110,7 @@ class MockEvent:
         self.is_at_or_wake_command = wake  # 模拟新版AstrBot：@bot时该标志也为True
         self._extras = {"handlers_parsed_params": parsed_params or {}}
         self.stopped = False
+        self.llm_blocked = False
         self.results = []
 
     def get_self_id(self):
@@ -127,6 +129,10 @@ class MockEvent:
 
     def stop_event(self):
         self.stopped = True
+
+    def should_call_llm(self, call_llm):
+        # AstrBot 语义：call_llm=True 表示禁止默认 LLM 请求本条消息
+        self.llm_blocked = call_llm
 
 
 def run_handle(plugin, ev, need_at=True):
@@ -152,7 +158,7 @@ assert not out and not stopped
 # 第3次应被拦截
 ev1c = MockEvent([At("10086")], wake=True)
 out, stopped = run_handle(plugin, ev1c)
-assert out and stopped, "第3次@bot应被拦截"
+assert out and ev1c.llm_blocked and not stopped, "第3次@bot应被拦截（仅禁止LLM，不终止事件）"
 print("2. @bot 限流触发 OK（is_at_or_wake_command=True 也不影响）")
 
 # 场景2：@别人 忽略
@@ -194,7 +200,7 @@ for _ in range(3):
 assert plugin.records["groupE"]["minute"].__len__() >= 2
 ev_groupA = MockEvent([At("10086")], wake=True, session="groupA")
 out, stopped = run_handle(plugin, ev_groupA)  # groupA 早已满
-assert stopped
+assert ev_groupA.llm_blocked and not stopped
 print("7. 各群独立计数 OK（groupA满额被拦，groupE独立）")
 
 # 场景7：冷却静默（notice_cooldown=30）
@@ -202,10 +208,12 @@ cfg2 = dict(cfg); cfg2["notice_cooldown"] = 30
 p2 = main.ChatRateLimitPlugin(Context(), cfg2)
 run_handle(p2, MockEvent([At("10086")], wake=True, session="g"))
 run_handle(p2, MockEvent([At("10086")], wake=True, session="g"))
-out, stopped = run_handle(p2, MockEvent([At("10086")], wake=True, session="g"))
-assert stopped and out, "首次超限应回复提示"
-out2, stopped2 = run_handle(p2, MockEvent([At("10086")], wake=True, session="g"))
-assert stopped2 and not out2, "冷却期内应静默拦截"
+ev_a = MockEvent([At("10086")], wake=True, session="g")
+out, stopped = run_handle(p2, ev_a)
+assert out and not stopped and ev_a.llm_blocked, "首次超限应回复提示并仅禁止LLM"
+ev_b = MockEvent([At("10086")], wake=True, session="g")
+out2, stopped2 = run_handle(p2, ev_b)
+assert not out2 and not stopped2 and ev_b.llm_blocked, "冷却期内应静默禁止LLM"
 print("8. 提示冷却 OK（首次回复，冷却内静默）")
 
 print("\n全部 8 组场景测试通过 ✓")
